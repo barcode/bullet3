@@ -31,6 +31,7 @@
 #include "BulletCollision/NarrowPhaseCollision/btPersistentManifold.h"
 #include "Bullet3Common/b3HashMap.h"
 #include "../Utils/ChromeTraceUtil.h"
+#include "SharedMemoryPublic.h"
 #include "stb_image/stb_image.h"
 #include "BulletInverseDynamics/MultiBodyTree.hpp"
 #include "IKTrajectoryHelper.h"
@@ -1642,7 +1643,6 @@ struct PhysicsServerCommandProcessorInternalData
     btAlignedObjectArray<btDeformableLagrangianForce*> m_lf;
 #endif
 	
-	
 	btMultiBodyDynamicsWorld* m_dynamicsWorld;
 
 	int m_constraintSolverType;
@@ -2364,7 +2364,12 @@ struct ProgrammaticUrdfInterface : public URDFImporterInterface
 				jointType = URDFFixedJoint;
 				break;
 			}
-			//case	eSphericalType:
+			case eSphericalType:
+			{
+				isValid = true;
+				jointType = URDFSphericalJoint;
+				break;
+			}
 			//case	ePlanarType:
 			//case	eFixedType:
 			//case ePoint2PointType:
@@ -3009,6 +3014,48 @@ void PhysicsServerCommandProcessor::createJointMotors(btMultiBody* mb)
 	}
 }
 
+int PhysicsServerCommandProcessor::addUserData(int bodyUniqueId, int linkIndex, int visualShapeIndex, const char* key, const char* valueBytes, int valueLength, int valueType) {
+	InternalBodyData* body = m_data->m_bodyHandles.getHandle(bodyUniqueId);
+	if (!body)
+	{
+		return -1;
+	}
+
+	SharedMemoryUserDataHashKey userDataIdentifier(key, bodyUniqueId, linkIndex, visualShapeIndex);
+
+	int* userDataHandlePtr = m_data->m_userDataHandleLookup.find(userDataIdentifier);
+	int userDataHandle = userDataHandlePtr ? *userDataHandlePtr : m_data->m_userDataHandles.allocHandle();
+
+	SharedMemoryUserData* userData = m_data->m_userDataHandles.getHandle(userDataHandle);
+	if (!userData)
+	{
+		return -1;
+	}
+
+	if (!userDataHandlePtr)
+	{
+		userData->m_key = key;
+		userData->m_bodyUniqueId = bodyUniqueId;
+		userData->m_linkIndex = linkIndex;
+		userData->m_visualShapeIndex = visualShapeIndex;
+		m_data->m_userDataHandleLookup.insert(userDataIdentifier, userDataHandle);
+		body->m_userDataHandles.push_back(userDataHandle);
+	}
+	userData->replaceValue(valueBytes, valueLength, valueType);
+	return userDataHandle;
+}
+
+void PhysicsServerCommandProcessor::addUserData(const btHashMap<btHashString, std::string>& user_data_entries, int bodyUniqueId, int linkIndex, int visualShapeIndex) {
+	for (int i = 0; i < user_data_entries.size(); ++i) {
+		const std::string key = user_data_entries.getKeyAtIndex(i).m_string1;
+		const std::string* value = user_data_entries.getAtIndex(i);
+		if (value) {
+			addUserData(bodyUniqueId, linkIndex, visualShapeIndex, key.c_str(), value->c_str(),
+						value->size()+1, USER_DATA_VALUE_TYPE_STRING);
+		}
+	}
+}
+
 bool PhysicsServerCommandProcessor::processImportedObjects(const char* fileName, char* bufferServerToClient, int bufferSizeInBytes, bool useMultiBody, int flags, URDFImporterInterface& u2b)
 {
 	bool loadOk = true;
@@ -3282,6 +3329,18 @@ bool PhysicsServerCommandProcessor::processImportedObjects(const char* fileName,
 				}
 			}
 		}
+
+	const UrdfModel* urdfModel = u2b.getUrdfModel();
+	if (urdfModel) {
+		addUserData(urdfModel->m_userData, bodyUniqueId);
+		for (int linkIndex = 0; linkIndex < urdfModel->m_links.size(); ++linkIndex) {
+			const UrdfLink* link = *urdfModel->m_links.getAtIndex(linkIndex);
+			addUserData(link->m_userData, bodyUniqueId, linkIndex - 1);
+			for (int visualShapeIndex = 0; visualShapeIndex < link->m_visualArray.size(); ++visualShapeIndex) {
+				addUserData(link->m_visualArray.at(visualShapeIndex).m_userData, bodyUniqueId, linkIndex - 1, visualShapeIndex);
+			}
+		}
+	}
 
 		b3Notification notification;
 		notification.m_notificationType = BODY_ADDED;
@@ -6080,11 +6139,30 @@ bool PhysicsServerCommandProcessor::processSyncUserDataCommand(const struct Shar
 	BT_PROFILE("CMD_SYNC_USER_DATA");
 
 	b3AlignedObjectArray<int> userDataHandles;
-	m_data->m_userDataHandles.getUsedHandles(userDataHandles);
+	if (clientCmd.m_syncUserDataRequestArgs.m_numRequestedBodies == 0)
+	{
+		m_data->m_userDataHandles.getUsedHandles(userDataHandles);
+	}
+	else
+	{
+		for (int i=0; i<clientCmd.m_syncUserDataRequestArgs.m_numRequestedBodies; ++i) {
+			const int bodyUniqueId = clientCmd.m_syncUserDataRequestArgs.m_requestedBodyIds[i];
+			InternalBodyData* body = m_data->m_bodyHandles.getHandle(bodyUniqueId);
+			if (!body)
+			{
+				return hasStatus;
+			}
+			for (int j=0; j < body->m_userDataHandles.size(); ++j) {
+				userDataHandles.push_back(body->m_userDataHandles[j]);
+			}
+		}
+	}
 	if (userDataHandles.size())
 	{
 		memcpy(bufferServerToClient, &userDataHandles[0], sizeof(int) * userDataHandles.size());
 	}
+	// Only clear the client-side cache when a full sync is requested
+	serverStatusOut.m_syncUserDataArgs.m_clearCachedUserDataEntries = clientCmd.m_syncUserDataRequestArgs.m_numRequestedBodies == 0;
 	serverStatusOut.m_syncUserDataArgs.m_numUserDataIdentifiers = userDataHandles.size();
 	serverStatusOut.m_type = CMD_SYNC_USER_DATA_COMPLETED;
 	return hasStatus;
@@ -6130,38 +6208,14 @@ bool PhysicsServerCommandProcessor::processAddUserDataCommand(const struct Share
 	{
 		return hasStatus;
 	}
-
-	InternalBodyData* body = m_data->m_bodyHandles.getHandle(addUserDataArgs.m_bodyUniqueId);
-	if (!body)
-	{
+	int userDataHandle = addUserData(
+		addUserDataArgs.m_bodyUniqueId, addUserDataArgs.m_linkIndex,
+		addUserDataArgs.m_visualShapeIndex, addUserDataArgs.m_key,
+		bufferServerToClient, addUserDataArgs.m_valueLength,
+		addUserDataArgs.m_valueType);
+	if (userDataHandle < 0) {
 		return hasStatus;
 	}
-
-	SharedMemoryUserDataHashKey userDataIdentifier(
-		addUserDataArgs.m_key,
-		addUserDataArgs.m_bodyUniqueId,
-		addUserDataArgs.m_linkIndex,
-		addUserDataArgs.m_visualShapeIndex);
-
-	int* userDataHandlePtr = m_data->m_userDataHandleLookup.find(userDataIdentifier);
-	int userDataHandle = userDataHandlePtr ? *userDataHandlePtr : m_data->m_userDataHandles.allocHandle();
-
-	SharedMemoryUserData* userData = m_data->m_userDataHandles.getHandle(userDataHandle);
-	if (!userData)
-	{
-		return hasStatus;
-	}
-
-	if (!userDataHandlePtr)
-	{
-		userData->m_key = addUserDataArgs.m_key;
-		userData->m_bodyUniqueId = addUserDataArgs.m_bodyUniqueId;
-		userData->m_linkIndex = addUserDataArgs.m_linkIndex;
-		userData->m_visualShapeIndex = addUserDataArgs.m_visualShapeIndex;
-		m_data->m_userDataHandleLookup.insert(userDataIdentifier, userDataHandle);
-		body->m_userDataHandles.push_back(userDataHandle);
-	}
-	userData->replaceValue(bufferServerToClient, addUserDataArgs.m_valueLength, addUserDataArgs.m_valueType);
 
 	serverStatusOut.m_type = CMD_ADD_USER_DATA_COMPLETED;
 	UserDataResponseArgs& userDataResponseArgs = serverStatusOut.m_userDataResponseArgs;
@@ -8070,7 +8124,7 @@ bool PhysicsServerCommandProcessor::processLoadSoftBodyCommand(const struct Shar
 	{
 		collisionMargin = clientCmd.m_loadSoftBodyArguments.m_collisionMargin;
 	}
-        
+    btScalar spring_bending_stiffness = 0;
 	{
         btSoftBody* psb = NULL;
         
@@ -8137,7 +8191,7 @@ bool PhysicsServerCommandProcessor::processLoadSoftBodyCommand(const struct Shar
             }
         }
 #ifndef SKIP_DEFORMABLE_BODY
-        btScalar spring_elastic_stiffness, spring_damping_stiffness;
+            btScalar spring_elastic_stiffness, spring_damping_stiffness;
 	    if (clientCmd.m_updateFlags & LOAD_SOFT_BODY_ADD_MASS_SPRING_FORCE)
 	    {
 			btDeformableMultiBodyDynamicsWorld* deformWorld = getDeformableWorld();
@@ -8145,7 +8199,11 @@ bool PhysicsServerCommandProcessor::processLoadSoftBodyCommand(const struct Shar
 			{
 				spring_elastic_stiffness = clientCmd.m_loadSoftBodyArguments.m_springElasticStiffness;
 				spring_damping_stiffness = clientCmd.m_loadSoftBodyArguments.m_springDampingStiffness;
-				btDeformableLagrangianForce* springForce = new btDeformableMassSpringForce(spring_elastic_stiffness, spring_damping_stiffness, false);
+                if (clientCmd.m_updateFlags & LOAD_SOFT_BODY_ADD_BENDING_SPRINGS)
+                {
+                    spring_bending_stiffness = clientCmd.m_loadSoftBodyArguments.m_springBendingStiffness;
+                }
+				btDeformableLagrangianForce* springForce = new btDeformableMassSpringForce(spring_elastic_stiffness, spring_damping_stiffness, true, spring_bending_stiffness);
 				deformWorld->addForce(psb, springForce);
 				m_data->m_lf.push_back(springForce);
 			}
@@ -8178,12 +8236,16 @@ bool PhysicsServerCommandProcessor::processLoadSoftBodyCommand(const struct Shar
 					deformWorld->addForce(psb, neohookeanForce);
 					m_data->m_lf.push_back(neohookeanForce);
 				}
-				btScalar spring_elastic_stiffness, spring_damping_stiffness;
+                btScalar spring_elastic_stiffness, spring_damping_stiffness;
 				if (clientCmd.m_updateFlags & LOAD_SOFT_BODY_ADD_MASS_SPRING_FORCE)
 				{
 					spring_elastic_stiffness = clientCmd.m_loadSoftBodyArguments.m_springElasticStiffness;
 					spring_damping_stiffness = clientCmd.m_loadSoftBodyArguments.m_springDampingStiffness;
-					btDeformableLagrangianForce* springForce = new btDeformableMassSpringForce(spring_elastic_stiffness, spring_damping_stiffness, true);
+                    if (clientCmd.m_updateFlags & LOAD_SOFT_BODY_ADD_BENDING_SPRINGS)
+                    {
+                        spring_bending_stiffness = clientCmd.m_loadSoftBodyArguments.m_springBendingStiffness;
+                    }
+					btDeformableLagrangianForce* springForce = new btDeformableMassSpringForce(spring_elastic_stiffness, spring_damping_stiffness, true, spring_bending_stiffness);
 					deformWorld->addForce(psb, springForce);
 					m_data->m_lf.push_back(springForce);
 				}
@@ -8258,19 +8320,18 @@ bool PhysicsServerCommandProcessor::processLoadSoftBodyCommand(const struct Shar
                     friction_coeff = loadSoftBodyArgs.m_frictionCoeff;
             }
             psb->m_cfg.kDF = friction_coeff;
-            
-            bool use_bending_spring = true;
+            bool use_bending_spring = false;
             if (clientCmd.m_updateFlags & LOAD_SOFT_BODY_ADD_BENDING_SPRINGS)
             {
-                    use_bending_spring = loadSoftBodyArgs.m_useBendingSprings;
+                use_bending_spring = loadSoftBodyArgs.m_useBendingSprings;
+                if (use_bending_spring)
+                {
+                    psb->generateBendingConstraints(2);
+                }
             }
             btSoftBody::Material* pm = psb->appendMaterial();
             pm->m_flags -= btSoftBody::fMaterial::DebugDraw;
-            if (use_bending_spring)
-            {
-                    psb->generateBendingConstraints(2,pm);
-            }
-
+            
             // turn on the collision flag for deformable
             // collision between deformable and rigid
             psb->m_cfg.collisions = btSoftBody::fCollision::SDF_RD;
@@ -9342,6 +9403,16 @@ bool PhysicsServerCommandProcessor::processSendPhysicsParametersCommand(const st
 		if (deformWorld)
 		{
 			deformWorld->getWorldInfo().m_gravity = grav;
+			for (int i = 0; i < m_data->m_lf.size(); ++i)
+			{
+				btDeformableLagrangianForce* force = m_data->m_lf[i];
+				if (force->getForceType() == BT_GRAVITY_FORCE)
+				{
+					btDeformableGravityForce* gforce = (btDeformableGravityForce*)force;
+					gforce->m_gravity = grav;
+				}
+			}
+
 		}
 		
 
@@ -10533,7 +10604,7 @@ bool PhysicsServerCommandProcessor::processRemoveBodyCommand(const struct Shared
 				{
 					if (m_data->m_pluginManager.getRenderInterface())
 					{
-						m_data->m_pluginManager.getRenderInterface()->removeVisualShape(bodyHandle->m_multiBody->getBaseCollider()->getBroadphaseHandle()->getUid());
+						m_data->m_pluginManager.getRenderInterface()->removeVisualShape(bodyHandle->m_multiBody->getBaseCollider()->getUserIndex3());
 					}
 					m_data->m_dynamicsWorld->removeCollisionObject(bodyHandle->m_multiBody->getBaseCollider());
 					int graphicsIndex = bodyHandle->m_multiBody->getBaseCollider()->getUserIndex();
@@ -10547,7 +10618,7 @@ bool PhysicsServerCommandProcessor::processRemoveBodyCommand(const struct Shared
 					{
 						if (m_data->m_pluginManager.getRenderInterface())
 						{
-							m_data->m_pluginManager.getRenderInterface()->removeVisualShape(bodyHandle->m_multiBody->getLink(link).m_collider->getBroadphaseHandle()->getUid());
+							m_data->m_pluginManager.getRenderInterface()->removeVisualShape(bodyHandle->m_multiBody->getLink(link).m_collider->getUserIndex3());
 						}
 						m_data->m_dynamicsWorld->removeCollisionObject(bodyHandle->m_multiBody->getLink(link).m_collider);
 						int graphicsIndex = bodyHandle->m_multiBody->getLink(link).m_collider->getUserIndex();
@@ -10567,7 +10638,7 @@ bool PhysicsServerCommandProcessor::processRemoveBodyCommand(const struct Shared
 			{
 				if (m_data->m_pluginManager.getRenderInterface())
 				{
-					m_data->m_pluginManager.getRenderInterface()->removeVisualShape(bodyHandle->m_rigidBody->getBroadphaseHandle()->getUid());
+					m_data->m_pluginManager.getRenderInterface()->removeVisualShape(bodyHandle->m_rigidBody->getUserIndex3());
 				}
 				serverCmd.m_removeObjectArgs.m_bodyUniqueIds[serverCmd.m_removeObjectArgs.m_numBodies++] = bodyUniqueId;
 
@@ -10591,7 +10662,7 @@ bool PhysicsServerCommandProcessor::processRemoveBodyCommand(const struct Shared
 				btSoftBody* psb = bodyHandle->m_softBody;
 				if (m_data->m_pluginManager.getRenderInterface())
 				{
-					m_data->m_pluginManager.getRenderInterface()->removeVisualShape(psb->getBroadphaseHandle()->getUid());
+					m_data->m_pluginManager.getRenderInterface()->removeVisualShape(psb->getUserIndex3());
 				}
 				serverCmd.m_removeObjectArgs.m_bodyUniqueIds[serverCmd.m_removeObjectArgs.m_numBodies++] = bodyUniqueId;
 				btSoftMultiBodyDynamicsWorld* softWorld = getSoftWorld();

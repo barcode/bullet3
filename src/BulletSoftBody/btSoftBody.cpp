@@ -53,6 +53,7 @@ btSoftBody::btSoftBody(btSoftBodyWorldInfo* worldInfo, int node_count, const btV
 		n.m_material = pm;
 	}
 	updateBounds();
+	setCollisionQuadrature(3);
 }
 
 btSoftBody::btSoftBody(btSoftBodyWorldInfo* worldInfo)
@@ -117,7 +118,7 @@ void btSoftBody::initDefaults()
 	m_restLengthScale = btScalar(1.0);
     m_dampingCoefficient = 1;
     m_sleepingThreshold = 0.1;
-    m_useFaceContact = false;
+    m_useFaceContact = true;
 	m_useSelfCollision = false;
     m_collisionFlags = 0;
 }
@@ -325,7 +326,7 @@ void btSoftBody::appendFace(int model, Material* mat)
 		ZeroInitialize(f);
 		f.m_material = mat ? mat : m_materials[0];
 	}
-	m_faces.push_back(f);
+    m_faces.push_back(f);
 }
 
 //
@@ -2403,10 +2404,9 @@ bool btSoftBody::checkDeformableContact(const btCollisionObjectWrapper* colObjWr
     const btCollisionObject* tmpCollisionObj = colObjWrap->getCollisionObject();
     // use the position x_{n+1}^* = x_n + dt * v_{n+1}^* where v_{n+1}^* = v_n + dtg for collision detect
     // but resolve contact at x_n
-//    btTransform wtr = (predict) ?
-//    (colObjWrap->m_preTransform != NULL ? tmpCollisionObj->getInterpolationWorldTransform()*(*colObjWrap->m_preTransform) : tmpCollisionObj->getInterpolationWorldTransform())
-//                 : colObjWrap->getWorldTransform();
-    const btTransform& wtr = colObjWrap->getWorldTransform();
+    btTransform wtr = (predict) ?
+    (colObjWrap->m_preTransform != NULL ? tmpCollisionObj->getInterpolationWorldTransform()*(*colObjWrap->m_preTransform) : tmpCollisionObj->getInterpolationWorldTransform())
+                 : colObjWrap->getWorldTransform();
 	btScalar dst =
 		m_worldInfo->m_sparsesdf.Evaluate(
 			wtr.invXform(x),
@@ -2443,7 +2443,7 @@ static void getBarycentric(const btVector3& p, btVector3& a, btVector3& b, btVec
 
 //
 bool btSoftBody::checkDeformableFaceContact(const btCollisionObjectWrapper* colObjWrap,
-                                        const Face& f,
+                                        Face& f,
                                         btVector3& contact_point,
                                         btVector3& bary,
                                         btScalar margin,
@@ -2457,28 +2457,116 @@ bool btSoftBody::checkDeformableFaceContact(const btCollisionObjectWrapper* colO
     btTransform wtr = (predict) ?
     (colObjWrap->m_preTransform != NULL ? tmpCollisionObj->getInterpolationWorldTransform()*(*colObjWrap->m_preTransform) : tmpCollisionObj->getInterpolationWorldTransform())
     : colObjWrap->getWorldTransform();
+    btScalar dst;
     
-    btGjkEpaSolver2::sResults results;
-    btTransform triangle_transform;
-    triangle_transform.setIdentity();
-    triangle_transform.setOrigin(f.m_n[0]->m_x);
-    btTriangleShape triangle(btVector3(0,0,0), f.m_n[1]->m_x-f.m_n[0]->m_x, f.m_n[2]->m_x-f.m_n[0]->m_x);
-    btVector3 guess(0,0,0);
-    const btConvexShape* csh = static_cast<const btConvexShape*>(shp);
-    btGjkEpaSolver2::SignedDistance(&triangle, triangle_transform, csh, wtr, guess, results);
-    btScalar dst = results.distance - margin;
-    contact_point = results.witnesses[0];
-    getBarycentric(contact_point, f.m_n[0]->m_x, f.m_n[1]->m_x, f.m_n[2]->m_x, bary);
+#define USE_QUADRATURE 1
+//#define CACHE_PREV_COLLISION
+    
+    // use the contact position of the previous collision
+#ifdef CACHE_PREV_COLLISION
+    if (f.m_pcontact[3] != 0)
+    {
+        for (int i = 0; i < 3; ++i)
+            bary[i] = f.m_pcontact[i];
+        contact_point = BaryEval(f.m_n[0]->m_x, f.m_n[1]->m_x, f.m_n[2]->m_x, bary);
+        dst = m_worldInfo->m_sparsesdf.Evaluate(
+                                          wtr.invXform(contact_point),
+                                          shp,
+                                          nrm,
+                                          margin);
+        nrm = wtr.getBasis() * nrm;
+        cti.m_colObj = colObjWrap->getCollisionObject();
+        // use cached contact point
+    }
+    else
+    {
+        btGjkEpaSolver2::sResults results;
+        btTransform triangle_transform;
+        triangle_transform.setIdentity();
+        triangle_transform.setOrigin(f.m_n[0]->m_x);
+        btTriangleShape triangle(btVector3(0,0,0), f.m_n[1]->m_x-f.m_n[0]->m_x, f.m_n[2]->m_x-f.m_n[0]->m_x);
+        btVector3 guess(0,0,0);
+        const btConvexShape* csh = static_cast<const btConvexShape*>(shp);
+        btGjkEpaSolver2::SignedDistance(&triangle, triangle_transform, csh, wtr, guess, results);
+        dst = results.distance - margin;
+        contact_point = results.witnesses[0];
+        getBarycentric(contact_point, f.m_n[0]->m_x, f.m_n[1]->m_x, f.m_n[2]->m_x, bary);
+        nrm = results.normal;
+        cti.m_colObj = colObjWrap->getCollisionObject();
+        for (int i = 0; i < 3; ++i)
+            f.m_pcontact[i] = bary[i];
+    }
+    return (dst < 0);
+#endif
+
+    // use collision quadrature point
+#ifdef USE_QUADRATURE
+    {
+        dst = SIMD_INFINITY;
+        btVector3 local_nrm;
+        for (int q = 0; q < m_quads.size(); ++q)
+        {
+            btVector3 p;
+            if (predict)
+                p = BaryEval(f.m_n[0]->m_q, f.m_n[1]->m_q, f.m_n[2]->m_q, m_quads[q]);
+            else
+                p = BaryEval(f.m_n[0]->m_x, f.m_n[1]->m_x, f.m_n[2]->m_x, m_quads[q]);
+            btScalar local_dst = m_worldInfo->m_sparsesdf.Evaluate(
+                                                    wtr.invXform(p),
+                                                    shp,
+                                                    local_nrm,
+                                                    margin);
+            if (local_dst < dst)
+            {
+                if (local_dst < 0 && predict)
+                    return true;
+                dst = local_dst;
+                contact_point = p;
+                bary = m_quads[q];
+                nrm = local_nrm;
+            }
+            if (!predict)
+            {
+                cti.m_colObj = colObjWrap->getCollisionObject();
+                cti.m_normal = wtr.getBasis() * nrm;
+                cti.m_offset = dst;
+            }
+        }
+        return (dst < 0);
+    }
+#endif
+    
+    // regular face contact
+    {
+        btGjkEpaSolver2::sResults results;
+        btTransform triangle_transform;
+        triangle_transform.setIdentity();
+        triangle_transform.setOrigin(f.m_n[0]->m_x);
+        btTriangleShape triangle(btVector3(0,0,0), f.m_n[1]->m_x-f.m_n[0]->m_x, f.m_n[2]->m_x-f.m_n[0]->m_x);
+        btVector3 guess(0,0,0);
+        if (predict)
+        {
+            triangle_transform.setOrigin(f.m_n[0]->m_q);
+            triangle = btTriangleShape(btVector3(0,0,0), f.m_n[1]->m_q-f.m_n[0]->m_q, f.m_n[2]->m_q-f.m_n[0]->m_q);
+        }
+        const btConvexShape* csh = static_cast<const btConvexShape*>(shp);
+        btGjkEpaSolver2::SignedDistance(&triangle, triangle_transform, csh, wtr, guess, results);
+        dst = results.distance - margin;
+        contact_point = results.witnesses[0];
+        getBarycentric(contact_point, f.m_n[0]->m_x, f.m_n[1]->m_x, f.m_n[2]->m_x, bary);
+        nrm = results.normal;
+        for (int i = 0; i < 3; ++i)
+            f.m_pcontact[i] = bary[i];
+    }
+    
     if (!predict)
     {
         cti.m_colObj = colObjWrap->getCollisionObject();
-//        cti.m_normal = wtr.getBasis() * results.normal;
-        cti.m_normal = results.normal;
+        cti.m_normal = nrm;
         cti.m_offset = dst;
     }
-    if (dst < 0)
-        return true;
-    return (false);
+    
+    return (dst < 0);
 }
 
 //
@@ -3315,6 +3403,17 @@ void btSoftBody::interpolateRenderMesh()
     }
 }
 
+void btSoftBody::setCollisionQuadrature(int N)
+{
+    for (int i = 0; i <= N; ++i)
+    {
+        for (int j = 0; i+j <= N; ++j)
+        {
+            m_quads.push_back(btVector3(btScalar(i)/btScalar(N), btScalar(j)/btScalar(N), btScalar(N-i-j)/btScalar(N)));
+        }
+    }
+}
+
 //
 void btSoftBody::PSolve_Anchors(btSoftBody* psb, btScalar kst, btScalar ti)
 {
@@ -3599,8 +3698,8 @@ void btSoftBody::defaultCollisionHandler(const btCollisionObjectWrapper* pcoWrap
                     docollideFace.psb = this;
                     docollideFace.m_colObj1Wrap = pcoWrap;
                     docollideFace.m_rigidBody = prb1;
-                    docollideFace.dynmargin = basemargin + timemargin;
-                    docollideFace.stamargin = basemargin;
+					docollideFace.dynmargin = 0.05*(basemargin + timemargin);
+					docollideFace.stamargin = 0.05*basemargin;
                     m_fdbvt.collideTV(m_fdbvt.m_root, volume, docollideFace);
                 }
             }
@@ -3706,12 +3805,20 @@ void btSoftBody::defaultCollisionHandler(btSoftBody* psb)
                     docollide.mrg = getCollisionShape()->getMargin() +
                     psb->getCollisionShape()->getMargin();
                     /* psb0 nodes vs psb1 faces    */
+                    if (psb->m_tetras.size() > 0)
+                        docollide.useFaceNormal = true;
+                    else
+                        docollide.useFaceNormal = false;
                     docollide.psb[0] = this;
                     docollide.psb[1] = psb;
                     docollide.psb[0]->m_ndbvt.collideTT(docollide.psb[0]->m_ndbvt.m_root,
                                                         docollide.psb[1]->m_fdbvt.m_root,
                                                         docollide);
                     /* psb1 nodes vs psb0 faces    */
+                    if (this->m_tetras.size() > 0)
+                        docollide.useFaceNormal = true;
+                    else
+                        docollide.useFaceNormal = false;
                     docollide.psb[0] = psb;
                     docollide.psb[1] = this;
                     docollide.psb[0]->m_ndbvt.collideTT(docollide.psb[0]->m_ndbvt.m_root,
@@ -3727,6 +3834,10 @@ void btSoftBody::defaultCollisionHandler(btSoftBody* psb)
                       psb->getCollisionShape()->getMargin();
                       docollide.psb[0] = this;
                       docollide.psb[1] = psb;
+                      if (this->m_tetras.size() > 0)
+                          docollide.useFaceNormal = true;
+                      else
+                          docollide.useFaceNormal = false;
                       /* psb0 faces vs psb0 faces    */
                       btDbvntNode* root = copyToDbvnt(this->m_fdbvt.m_root);
                       calculateNormalCone(root);

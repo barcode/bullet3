@@ -523,18 +523,19 @@ struct LoadSoftBodyArgs
 	double m_mass;
 	double m_collisionMargin;
 	double m_initialPosition[3];
-        double m_initialOrientation[4];
-        double m_springElasticStiffness;
-        double m_springDampingStiffness;
-        double m_corotatedMu;
-        double m_corotatedLambda;
-        int m_useBendingSprings;
-        double m_collisionHardness;
-        double m_useSelfCollision;
-        double m_frictionCoeff;
-        double m_NeoHookeanMu;
-        double m_NeoHookeanLambda;
-        double m_NeoHookeanDamping;
+    double m_initialOrientation[4];
+    double m_springElasticStiffness;
+    double m_springDampingStiffness;
+    double m_springBendingStiffness;
+    double m_corotatedMu;
+    double m_corotatedLambda;
+    int m_useBendingSprings;
+    double m_collisionHardness;
+    double m_useSelfCollision;
+    double m_frictionCoeff;
+    double m_NeoHookeanMu;
+    double m_NeoHookeanLambda;
+    double m_NeoHookeanDamping;
     int m_useFaceContact;
     char m_simFileName[MAX_FILENAME_LENGTH];
 };
@@ -788,22 +789,6 @@ struct CalculateInverseKinematicsResultArgs
 	double m_jointPositions[MAX_DEGREE_OF_FREEDOM];
 };
 
-enum EnumUserConstraintFlags
-{
-	USER_CONSTRAINT_ADD_CONSTRAINT = 1,
-	USER_CONSTRAINT_REMOVE_CONSTRAINT = 2,
-	USER_CONSTRAINT_CHANGE_CONSTRAINT = 4,
-	USER_CONSTRAINT_CHANGE_PIVOT_IN_B = 8,
-	USER_CONSTRAINT_CHANGE_FRAME_ORN_IN_B = 16,
-	USER_CONSTRAINT_CHANGE_MAX_FORCE = 32,
-	USER_CONSTRAINT_REQUEST_INFO = 64,
-	USER_CONSTRAINT_CHANGE_GEAR_RATIO = 128,
-	USER_CONSTRAINT_CHANGE_GEAR_AUX_LINK = 256,
-	USER_CONSTRAINT_CHANGE_RELATIVE_POSITION_TARGET = 512,
-	USER_CONSTRAINT_CHANGE_ERP = 1024,
-	USER_CONSTRAINT_REQUEST_STATE = 2048,
-	USER_CONSTRAINT_ADD_SOFT_BODY_ANCHOR = 4096,
-};
 
 enum EnumBodyChangeFlags
 {
@@ -1059,11 +1044,21 @@ struct b3StateSerializationArguments
 	int m_stateId;
 };
 
+struct SyncUserDataRequestArgs
+{
+	// The number of bodies for which we'd like to sync the user data of. When 0, all bodies are synced.
+	int m_numRequestedBodies;
+	// The body IDs for which we'd like to sync the user data of.
+	int m_requestedBodyIds[MAX_REQUESTED_BODIES_LENGTH];
+};
+
 struct SyncUserDataArgs
 {
 	// User data identifiers stored in m_bulletStreamDataServerToClientRefactor
 	// as as array of integers.
 	int m_numUserDataIdentifiers;
+	// Whether the client should clear its user data cache.
+	bool m_clearCachedUserDataEntries;
 };
 
 struct UserDataRequestArgs
@@ -1163,6 +1158,7 @@ struct SharedMemoryCommand
 		struct b3CustomCommand m_customCommandArgs;
 		struct b3StateSerializationArguments m_loadStateArguments;
 		struct RequestCollisionShapeDataArgs m_requestCollisionShapeDataArguments;
+		struct SyncUserDataRequestArgs m_syncUserDataRequestArgs;
 		struct UserDataRequestArgs m_userDataRequestArgs;
 		struct AddUserDataRequestArgs m_addUserDataRequestArgs;
 		struct UserDataRequestArgs m_removeUserDataRequestArgs;

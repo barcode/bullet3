@@ -752,14 +752,19 @@ static PyObject* pybullet_syncUserData(PyObject* self, PyObject* args, PyObject*
 {
 	b3PhysicsClientHandle sm = 0;
 	int physicsClientId = 0;
-	static char* kwlist[] = {"physicsClientId", NULL};
+	static char* kwlistSingleBody[] = {"bodyUniqueId", "physicsClientId", NULL};
+	static char* kwlistMultipleBodies[] = {"bodyUniqueIds", "physicsClientId", NULL};
 	b3SharedMemoryCommandHandle command;
 	b3SharedMemoryStatusHandle statusHandle;
 	int statusType;
-
-	if (!PyArg_ParseTupleAndKeywords(args, keywds, "|i", kwlist, &physicsClientId))
-	{
-		return NULL;
+	PyObject* bodyUniqueIdsObj = 0;
+	int requestedBodyUniqueId = -1;
+	if (!PyArg_ParseTupleAndKeywords(args, keywds, "|ii", kwlistSingleBody, &requestedBodyUniqueId, &physicsClientId)) {
+		PyErr_Clear();
+		if (!PyArg_ParseTupleAndKeywords(args, keywds, "|Oi", kwlistMultipleBodies, &bodyUniqueIdsObj, &physicsClientId))
+		{
+			return NULL;
+		}
 	}
 	sm = getPhysicsClient(physicsClientId);
 	if (sm == 0)
@@ -769,6 +774,20 @@ static PyObject* pybullet_syncUserData(PyObject* self, PyObject* args, PyObject*
 	}
 
 	command = b3InitSyncUserDataCommand(sm);
+	if (bodyUniqueIdsObj)
+	{
+		PyObject *seq = PySequence_Fast(bodyUniqueIdsObj, "expected a sequence");
+		int len = PySequence_Size(bodyUniqueIdsObj);
+		for (int i=0; i < len; ++i)
+		{
+			b3AddBodyToSyncUserDataRequest(command, pybullet_internalGetIntFromSequence(seq, i));
+		}
+	}
+	else if (requestedBodyUniqueId != -1)
+	{
+		b3AddBodyToSyncUserDataRequest(command, requestedBodyUniqueId);
+
+	}
 	statusHandle = b3SubmitClientCommandAndWaitStatus(sm, command);
 	statusType = b3GetStatusType(statusHandle);
 
@@ -1973,7 +1992,7 @@ static PyObject* pybullet_loadSoftBody(PyObject* self, PyObject* args, PyObject*
 	int physicsClientId = 0;
 	int flags = 0;
 
-	static char* kwlist[] = {"fileName", "basePosition", "baseOrientation", "scale", "mass", "collisionMargin", "physicsClientId", "useMassSpring", "useBendingSprings", "useNeoHookean", "springElasticStiffness", "springDampingStiffness", "NeoHookeanMu", "NeoHookeanLambda", "NeoHookeanDamping", "frictionCoeff", "useFaceContact", "useSelfCollision", NULL};
+	static char* kwlist[] = {"fileName", "basePosition", "baseOrientation", "scale", "mass", "collisionMargin", "physicsClientId", "useMassSpring", "useBendingSprings", "useNeoHookean", "springElasticStiffness", "springDampingStiffness", "springBendingStiffness", "NeoHookeanMu", "NeoHookeanLambda", "NeoHookeanDamping", "frictionCoeff", "useFaceContact", "useSelfCollision", NULL};
 
 	int bodyUniqueId = -1;
 	const char* fileName = "";
@@ -1985,6 +2004,7 @@ static PyObject* pybullet_loadSoftBody(PyObject* self, PyObject* args, PyObject*
 	int useNeoHookean = 0;
 	double springElasticStiffness = 1;
 	double springDampingStiffness = 0.1;
+	double springBendingStiffness = 0.1;
 	double NeoHookeanMu = 1;
 	double NeoHookeanLambda = 1;
 	double NeoHookeanDamping = 0.1;
@@ -2002,7 +2022,7 @@ static PyObject* pybullet_loadSoftBody(PyObject* self, PyObject* args, PyObject*
 	PyObject* basePosObj = 0;
 	PyObject* baseOrnObj = 0;
 
-	if (!PyArg_ParseTupleAndKeywords(args, keywds, "s|OOdddiiiiddddddii", kwlist, &fileName, &basePosObj, &baseOrnObj, &scale, &mass, &collisionMargin, &physicsClientId, &useMassSpring, &useBendingSprings, &useNeoHookean, &springElasticStiffness, &springDampingStiffness, &NeoHookeanMu, &NeoHookeanLambda, &NeoHookeanDamping, &frictionCoeff, &useFaceContact, &useSelfCollision))
+	if (!PyArg_ParseTupleAndKeywords(args, keywds, "s|OOdddiiiidddddddii", kwlist, &fileName, &basePosObj, &baseOrnObj, &scale, &mass, &collisionMargin, &physicsClientId, &useMassSpring, &useBendingSprings, &useNeoHookean, &springElasticStiffness, &springDampingStiffness, &springBendingStiffness, &NeoHookeanMu, &NeoHookeanLambda, &NeoHookeanDamping, &frictionCoeff, &useFaceContact, &useSelfCollision))
 	{
 		return NULL;
 	}
@@ -2058,11 +2078,15 @@ static PyObject* pybullet_loadSoftBody(PyObject* self, PyObject* args, PyObject*
 		if (useMassSpring)
 		{
 			b3LoadSoftBodyAddMassSpringForce(command, springElasticStiffness, springDampingStiffness);
-			b3LoadSoftBodyUseBendingSprings(command, useBendingSprings);
+			b3LoadSoftBodyUseBendingSprings(command, useBendingSprings, springBendingStiffness);
 		}
 		if (useNeoHookean)
 		{
 			b3LoadSoftBodyAddNeoHookeanForce(command, NeoHookeanMu, NeoHookeanLambda, NeoHookeanDamping);
+		}
+		if (useSelfCollision)
+		{
+			b3LoadSoftBodySetSelfCollision(command, useSelfCollision);
 		}
 		b3LoadSoftBodySetFrictionCoefficient(command, frictionCoeff);
 		statusHandle = b3SubmitClientCommandAndWaitStatus(sm, command);
@@ -11927,7 +11951,7 @@ static PyMethodDef SpamMethods[] = {
 	 "Update body and constraint/joint information, in case other clients made changes."},
 
 	{"syncUserData", (PyCFunction)pybullet_syncUserData, METH_VARARGS | METH_KEYWORDS,
-	 "syncUserData(physicsClientId=0)\n"
+	 "syncUserData(bodyUniqueIds=[], physicsClientId=0)\n"
 	 "Update user data, in case other clients made changes."},
 
 	{"addUserData", (PyCFunction)pybullet_addUserData, METH_VARARGS | METH_KEYWORDS,
