@@ -4,78 +4,76 @@
 #include <assert.h>
 #include <ctype.h>
 
-/*----------------------------------------------------------------------
-		Copyright (c) 2004 Open Dynamics Framework Group
-					www.physicstools.org
-		All rights reserved.
-
-		Redistribution and use in source and binary forms, with or without modification, are permitted provided
-		that the following conditions are met:
-
-		Redistributions of source code must retain the above copyright notice, this list of conditions
-		and the following disclaimer.
-
-		Redistributions in binary form must reproduce the above copyright notice,
-		this list of conditions and the following disclaimer in the documentation
-		and/or other materials provided with the distribution.
-
-		Neither the name of the Open Dynamics Framework Group nor the names of its contributors may
-		be used to endorse or promote products derived from this software without specific prior written permission.
-
-		THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES,
-		INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-		DISCLAIMED. IN NO EVENT SHALL THE INTEL OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-		EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-		LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
-		IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-		THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
------------------------------------------------------------------------*/
-
-// http://codesuppository.blogspot.com
-//
-// mailto: jratcliff@infiniplex.net
-//
-// http://www.amillionpixels.us
-//
-#include "float_math.h"
+#pragma warning(disable:4996)
 
 #include "cd_wavefront.h"
 
+
 using namespace ConvexDecomposition;
 
-/*----------------------------------------------------------------------
-		Copyright (c) 2004 Open Dynamics Framework Group
-					www.physicstools.org
-		All rights reserved.
+/*!  
+** 
+** Copyright (c) 2007 by John W. Ratcliff mailto:jratcliff@infiniplex.net
+**
+** Portions of this source has been released with the PhysXViewer application, as well as 
+** Rocket, CreateDynamics, ODF, and as a number of sample code snippets.
+**
+** If you find this code useful or you are feeling particularily generous I would
+** ask that you please go to http://www.amillionpixels.us and make a donation
+** to Troy DeMolay.
+**
+** DeMolay is a youth group for young men between the ages of 12 and 21.  
+** It teaches strong moral principles, as well as leadership skills and 
+** public speaking.  The donations page uses the 'pay for pixels' paradigm
+** where, in this case, a pixel is only a single penny.  Donations can be
+** made for as small as $4 or as high as a $100 block.  Each person who donates
+** will get a link to their own site as well as acknowledgement on the
+** donations blog located here http://www.amillionpixels.blogspot.com/
+**
+** If you wish to contact me you can use the following methods:
+**
+** Skype Phone: 636-486-4040 (let it ring a long time while it goes through switches)
+** Skype ID: jratcliff63367
+** Yahoo: jratcliff63367
+** AOL: jratcliff1961
+** email: jratcliff@infiniplex.net
+** Personal website: http://jratcliffscarab.blogspot.com
+** Coding Website:   http://codesuppository.blogspot.com
+** FundRaising Blog: http://amillionpixels.blogspot.com
+** Fundraising site: http://www.amillionpixels.us
+** New Temple Site:  http://newtemple.blogspot.com
+**
+**
+** The MIT license:
+**
+** Permission is hereby granted, free of charge, to any person obtaining a copy 
+** of this software and associated documentation files (the "Software"), to deal 
+** in the Software without restriction, including without limitation the rights 
+** to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+** copies of the Software, and to permit persons to whom the Software is furnished 
+** to do so, subject to the following conditions:
+**
+** The above copyright notice and this permission notice shall be included in all 
+** copies or substantial portions of the Software.
 
-		Redistribution and use in source and binary forms, with or without modification, are permitted provided
-		that the following conditions are met:
+** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+** IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+** FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+** AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+** WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+** CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-		Redistributions of source code must retain the above copyright notice, this list of conditions
-		and the following disclaimer.
+*/
 
-		Redistributions in binary form must reproduce the above copyright notice,
-		this list of conditions and the following disclaimer in the documentation
-		and/or other materials provided with the distribution.
 
-		Neither the name of the Open Dynamics Framework Group nor the names of its contributors may
-		be used to endorse or promote products derived from this software without specific prior written permission.
-
-		THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES,
-		INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-		DISCLAIMED. IN NO EVENT SHALL THE INTEL OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-		EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-		LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
-		IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-		THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
------------------------------------------------------------------------*/
 
 #include <vector>
 
 namespace ConvexDecomposition
 {
-typedef std::vector<int> IntVector;
-typedef std::vector<float> FloatVector;
+
+typedef std::vector< int > IntVector;
+typedef std::vector< double > FloatVector;
 
 #if defined(__APPLE__) || defined(__CELLOS_LV2__)
 #define stricmp(a, b) strcasecmp((a), (b))
@@ -87,17 +85,15 @@ typedef std::vector<float> FloatVector;
 class InPlaceParserInterface
 {
 public:
-	virtual ~InPlaceParserInterface(){};
-
-	virtual int ParseLine(int lineno, int argc, const char **argv) = 0;  // return TRUE to continue parsing, return FALSE to abort parsing process
+	virtual int ParseLine(int lineno,int argc,const char **argv) =0;  // return TRUE to continue parsing, return FALSE to abort parsing process
 };
 
 enum SeparatorType
 {
-	ST_DATA,  // is data
-	ST_HARD,  // is a hard separator
-	ST_SOFT,  // is a soft separator
-	ST_EOS    // is a comment symbol, and everything past this character should be ignored
+	ST_DATA,        // is data
+	ST_HARD,        // is a hard separator
+	ST_SOFT,        // is a soft separator
+	ST_EOS          // is a comment symbol, and everything past this character should be ignored
 };
 
 class InPlaceParser
@@ -108,10 +104,10 @@ public:
 		Init();
 	}
 
-	InPlaceParser(char *data, int len)
+	InPlaceParser(char *data,int len)
 	{
 		Init();
-		SetSourceData(data, len);
+		SetSourceData(data,len);
 	}
 
 	InPlaceParser(const char *fname)
@@ -126,61 +122,63 @@ public:
 	{
 		mQuoteChar = 34;
 		mData = 0;
-		mLen = 0;
+		mLen  = 0;
 		mMyAlloc = false;
-		for (int i = 0; i < 256; i++)
+		for (int i=0; i<256; i++)
 		{
 			mHard[i] = ST_DATA;
-			mHardString[i * 2] = i;
-			mHardString[i * 2 + 1] = 0;
+			mHardString[i*2] = i;
+			mHardString[i*2+1] = 0;
 		}
-		mHard[0] = ST_EOS;
+		mHard[0]  = ST_EOS;
 		mHard[32] = ST_SOFT;
-		mHard[9] = ST_SOFT;
+		mHard[9]  = ST_SOFT;
 		mHard[13] = ST_SOFT;
 		mHard[10] = ST_SOFT;
 	}
 
-	void SetFile(const char *fname);  // use this file as source data to parse.
+	void SetFile(const char *fname); // use this file as source data to parse.
 
-	void SetSourceData(char *data, int len)
+	void SetSourceData(char *data,int len)
 	{
 		mData = data;
-		mLen = len;
+		mLen  = len;
 		mMyAlloc = false;
 	};
 
-	int Parse(InPlaceParserInterface *callback);  // returns true if entire file was parsed, false if it aborted for some reason
+	int  Parse(InPlaceParserInterface *callback); // returns true if entire file was parsed, false if it aborted for some reason
 
-	int ProcessLine(int lineno, char *line, InPlaceParserInterface *callback);
+	int ProcessLine(int lineno,char *line,InPlaceParserInterface *callback);
 
-	const char **GetArglist(char *source, int &count);  // convert source string into an arg list, this is a destructive parse.
+	const char ** GetArglist(char *source,int &count); // convert source string into an arg list, this is a destructive parse.
 
-	void SetHardSeparator(char c)  // add a hard separator
+	void SetHardSeparator(char c) // add a hard separator
 	{
-		mHard[(int)c] = ST_HARD;
+		mHard[c] = ST_HARD;
 	}
 
-	void SetHard(char c)  // add a hard separator
+	void SetHard(char c) // add a hard separator
 	{
-		mHard[(int)c] = ST_HARD;
+		mHard[c] = ST_HARD;
 	}
 
-	void SetCommentSymbol(char c)  // comment character, treated as 'end of string'
+
+	void SetCommentSymbol(char c) // comment character, treated as 'end of string'
 	{
-		mHard[(int)c] = ST_EOS;
+		mHard[c] = ST_EOS;
 	}
 
 	void ClearHardSeparator(char c)
 	{
-		mHard[(int)c] = ST_DATA;
+		mHard[c] = ST_DATA;
 	}
 
-	void DefaultSymbols(void);  // set up default symbols for hard separator and comment symbol of the '#' character.
+
+	void DefaultSymbols(void); // set up default symbols for hard seperator and comment symbol of the '#' character.
 
 	bool EOS(char c)
 	{
-		if (mHard[(int)c] == ST_EOS)
+		if ( mHard[c] == ST_EOS )
 		{
 			return true;
 		}
@@ -193,18 +191,20 @@ public:
 	}
 
 private:
-	inline char *AddHard(int &argc, const char **argv, char *foo);
-	inline bool IsHard(char c);
-	inline char *SkipSpaces(char *foo);
-	inline bool IsWhiteSpace(char c);
-	inline bool IsNonSeparator(char c);  // non separator, neither hard nor soft
 
-	bool mMyAlloc;  // whether or not *I* allocated the buffer and am responsible for deleting it.
-	char *mData;    // ascii data to parse.
-	int mLen;       // length of data
-	SeparatorType mHard[256];
-	char mHardString[256 * 2];
-	char mQuoteChar;
+
+	inline char * AddHard(int &argc,const char **argv,char *foo);
+	inline bool   IsHard(char c);
+	inline char * SkipSpaces(char *foo);
+	inline bool   IsWhiteSpace(char c);
+	inline bool   IsNonSeparator(char c); // non seperator,neither hard nor soft
+
+	bool   mMyAlloc; // whether or not *I* allocated the buffer and am responsible for deleting it.
+	char  *mData;  // ascii data to parse.
+	int    mLen;   // length of data
+	SeparatorType  mHard[256];
+	char   mHardString[256*2];
+	char           mQuoteChar;
 };
 
 /*******************************************************************/
@@ -212,32 +212,33 @@ private:
 /*******************************************************************/
 void InPlaceParser::SetFile(const char *fname)
 {
-	if (mMyAlloc)
+	if ( mMyAlloc )
 	{
 		free(mData);
 	}
 	mData = 0;
-	mLen = 0;
+	mLen  = 0;
 	mMyAlloc = false;
 
-	FILE *fph = fopen(fname, "rb");
-	if (fph)
+
+	FILE *fph = fopen(fname,"rb");
+	if ( fph )
 	{
-		fseek(fph, 0L, SEEK_END);
+		fseek(fph,0L,SEEK_END);
 		mLen = ftell(fph);
-		fseek(fph, 0L, SEEK_SET);
-		if (mLen)
+		fseek(fph,0L,SEEK_SET);
+		if ( mLen )
 		{
-			mData = (char *)malloc(sizeof(char) * (mLen + 1));
+			mData = (char *) malloc(sizeof(char)*(mLen+1));
 			int ok = fread(mData, mLen, 1, fph);
-			if (!ok)
+			if ( !ok )
 			{
 				free(mData);
 				mData = 0;
 			}
 			else
 			{
-				mData[mLen] = 0;  // zero byte terminate end of file marker.
+				mData[mLen] = 0; // zero byte terminate end of file marker.
 				mMyAlloc = true;
 			}
 		}
@@ -247,7 +248,7 @@ void InPlaceParser::SetFile(const char *fname)
 
 InPlaceParser::~InPlaceParser(void)
 {
-	if (mMyAlloc)
+	if ( mMyAlloc )
 	{
 		free(mData);
 	}
@@ -257,15 +258,15 @@ InPlaceParser::~InPlaceParser(void)
 
 bool InPlaceParser::IsHard(char c)
 {
-	return mHard[(int)c] == ST_HARD;
+	return mHard[c] == ST_HARD;
 }
 
-char *InPlaceParser::AddHard(int &argc, const char **argv, char *foo)
+char * InPlaceParser::AddHard(int &argc,const char **argv,char *foo)
 {
-	while (IsHard(*foo))
+	while ( IsHard(*foo) )
 	{
-		const char *hard = &mHardString[*foo * 2];
-		if (argc < MAXARGS)
+		const char *hard = &mHardString[*foo*2];
+		if ( argc < MAXARGS )
 		{
 			argv[argc++] = hard;
 		}
@@ -274,24 +275,25 @@ char *InPlaceParser::AddHard(int &argc, const char **argv, char *foo)
 	return foo;
 }
 
-bool InPlaceParser::IsWhiteSpace(char c)
+bool   InPlaceParser::IsWhiteSpace(char c)
 {
-	return mHard[(int)c] == ST_SOFT;
+	return mHard[c] == ST_SOFT;
 }
 
-char *InPlaceParser::SkipSpaces(char *foo)
+char * InPlaceParser::SkipSpaces(char *foo)
 {
-	while (!EOS(*foo) && IsWhiteSpace(*foo)) foo++;
+	while ( !EOS(*foo) && IsWhiteSpace(*foo) ) foo++;
 	return foo;
 }
 
 bool InPlaceParser::IsNonSeparator(char c)
 {
-	if (!IsHard(c) && !IsWhiteSpace(c) && c != 0) return true;
+	if ( !IsHard(c) && !IsWhiteSpace(c) && c != 0 ) return true;
 	return false;
 }
 
-int InPlaceParser::ProcessLine(int lineno, char *line, InPlaceParserInterface *callback)
+
+int InPlaceParser::ProcessLine(int lineno,char *line,InPlaceParserInterface *callback)
 {
 	int ret = 0;
 
@@ -300,64 +302,66 @@ int InPlaceParser::ProcessLine(int lineno, char *line, InPlaceParserInterface *c
 
 	char *foo = line;
 
-	while (!EOS(*foo) && argc < MAXARGS)
+	while ( !EOS(*foo) && argc < MAXARGS )
 	{
-		foo = SkipSpaces(foo);  // skip any leading spaces
 
-		if (EOS(*foo)) break;
+		foo = SkipSpaces(foo); // skip any leading spaces
 
-		if (*foo == mQuoteChar)  // if it is an open quote
+		if ( EOS(*foo) ) break;
+
+		if ( *foo == mQuoteChar ) // if it is an open quote
 		{
 			foo++;
-			if (argc < MAXARGS)
+			if ( argc < MAXARGS )
 			{
 				argv[argc++] = foo;
 			}
-			while (!EOS(*foo) && *foo != mQuoteChar) foo++;
-			if (!EOS(*foo))
+			while ( !EOS(*foo) && *foo != mQuoteChar ) foo++;
+			if ( !EOS(*foo) )
 			{
-				*foo = 0;  // replace close quote with zero byte EOS
+				*foo = 0; // replace close quote with zero byte EOS
 				foo++;
 			}
 		}
 		else
 		{
-			foo = AddHard(argc, argv, foo);  // add any hard separators, skip any spaces
 
-			if (IsNonSeparator(*foo))  // add non-hard argument.
+			foo = AddHard(argc,argv,foo); // add any hard separators, skip any spaces
+
+			if ( IsNonSeparator(*foo) )  // add non-hard argument.
 			{
-				bool quote = false;
-				if (*foo == mQuoteChar)
+				bool quote  = false;
+				if ( *foo == mQuoteChar )
 				{
 					foo++;
 					quote = true;
 				}
 
-				if (argc < MAXARGS)
+				if ( argc < MAXARGS )
 				{
 					argv[argc++] = foo;
 				}
 
-				if (quote)
+				if ( quote )
 				{
-					while (*foo && *foo != mQuoteChar) foo++;
-					if (*foo) *foo = 32;
+					while (*foo && *foo != mQuoteChar ) foo++;
+					if ( *foo ) *foo = 32;
 				}
 
 				// continue..until we hit an eos ..
-				while (!EOS(*foo))  // until we hit EOS
+				while ( !EOS(*foo) ) // until we hit EOS
 				{
-					if (IsWhiteSpace(*foo))  // if we hit a space, stomp a zero byte, and exit
+					if ( IsWhiteSpace(*foo) ) // if we hit a space, stomp a zero byte, and exit
 					{
 						*foo = 0;
 						foo++;
 						break;
 					}
-					else if (IsHard(*foo))  // if we hit a hard separator, stomp a zero byte and store the hard separator argument
+					else if ( IsHard(*foo) ) // if we hit a hard separator, stomp a zero byte and store the hard separator argument
 					{
-						const char *hard = &mHardString[*foo * 2];
+						const char *hard = &mHardString[*foo*2];
 						*foo = 0;
-						if (argc < MAXARGS)
+						if ( argc < MAXARGS )
 						{
 							argv[argc++] = hard;
 						}
@@ -365,46 +369,47 @@ int InPlaceParser::ProcessLine(int lineno, char *line, InPlaceParserInterface *c
 						break;
 					}
 					foo++;
-				}  // end of while loop...
+				} // end of while loop...
 			}
 		}
 	}
 
-	if (argc)
+	if ( argc )
 	{
-		ret = callback->ParseLine(lineno, argc, argv);
+		ret = callback->ParseLine(lineno, argc, argv );
 	}
 
 	return ret;
 }
 
-int InPlaceParser::Parse(InPlaceParserInterface *callback)  // returns true if entire file was parsed, false if it aborted for some reason
+int  InPlaceParser::Parse(InPlaceParserInterface *callback) // returns true if entire file was parsed, false if it aborted for some reason
 {
-	assert(callback);
-	if (!mData) return 0;
+	assert( callback );
+	if ( !mData ) return 0;
 
 	int ret = 0;
 
 	int lineno = 0;
 
-	char *foo = mData;
+	char *foo   = mData;
 	char *begin = foo;
 
-	while (*foo)
+
+	while ( *foo )
 	{
-		if (*foo == 10 || *foo == 13)
+		if ( *foo == 10 || *foo == 13 )
 		{
 			lineno++;
 			*foo = 0;
 
-			if (*begin)  // if there is any data to parse at all...
+			if ( *begin ) // if there is any data to parse at all...
 			{
-				int v = ProcessLine(lineno, begin, callback);
-				if (v) ret = v;
+				int v = ProcessLine(lineno,begin,callback);
+				if ( v ) ret = v;
 			}
 
 			foo++;
-			if (*foo == 10) foo++;  // skip line feed, if it is in the carraige-return line-feed format...
+			if ( *foo == 10 ) foo++; // skip line feed, if it is in the carraige-return line-feed format...
 			begin = foo;
 		}
 		else
@@ -413,12 +418,13 @@ int InPlaceParser::Parse(InPlaceParserInterface *callback)  // returns true if e
 		}
 	}
 
-	lineno++;  // lasst line.
+	lineno++; // lasst line.
 
-	int v = ProcessLine(lineno, begin, callback);
-	if (v) ret = v;
+	int v = ProcessLine(lineno,begin,callback);
+	if ( v ) ret = v;
 	return ret;
 }
+
 
 void InPlaceParser::DefaultSymbols(void)
 {
@@ -433,73 +439,76 @@ void InPlaceParser::DefaultSymbols(void)
 	SetCommentSymbol('#');
 }
 
-const char **InPlaceParser::GetArglist(char *line, int &count)  // convert source string into an arg list, this is a destructive parse.
+
+const char ** InPlaceParser::GetArglist(char *line,int &count) // convert source string into an arg list, this is a destructive parse.
 {
 	const char **ret = 0;
 
-	const char *argv[MAXARGS];
+	static const char *argv[MAXARGS];
 	int argc = 0;
 
 	char *foo = line;
 
-	while (!EOS(*foo) && argc < MAXARGS)
+	while ( !EOS(*foo) && argc < MAXARGS )
 	{
-		foo = SkipSpaces(foo);  // skip any leading spaces
 
-		if (EOS(*foo)) break;
+		foo = SkipSpaces(foo); // skip any leading spaces
 
-		if (*foo == mQuoteChar)  // if it is an open quote
+		if ( EOS(*foo) ) break;
+
+		if ( *foo == mQuoteChar ) // if it is an open quote
 		{
 			foo++;
-			if (argc < MAXARGS)
+			if ( argc < MAXARGS )
 			{
 				argv[argc++] = foo;
 			}
-			while (!EOS(*foo) && *foo != mQuoteChar) foo++;
-			if (!EOS(*foo))
+			while ( !EOS(*foo) && *foo != mQuoteChar ) foo++;
+			if ( !EOS(*foo) )
 			{
-				*foo = 0;  // replace close quote with zero byte EOS
+				*foo = 0; // replace close quote with zero byte EOS
 				foo++;
 			}
 		}
 		else
 		{
-			foo = AddHard(argc, argv, foo);  // add any hard separators, skip any spaces
 
-			if (IsNonSeparator(*foo))  // add non-hard argument.
+			foo = AddHard(argc,argv,foo); // add any hard separators, skip any spaces
+
+			if ( IsNonSeparator(*foo) )  // add non-hard argument.
 			{
-				bool quote = false;
-				if (*foo == mQuoteChar)
+				bool quote  = false;
+				if ( *foo == mQuoteChar )
 				{
 					foo++;
 					quote = true;
 				}
 
-				if (argc < MAXARGS)
+				if ( argc < MAXARGS )
 				{
 					argv[argc++] = foo;
 				}
 
-				if (quote)
+				if ( quote )
 				{
-					while (*foo && *foo != mQuoteChar) foo++;
-					if (*foo) *foo = 32;
+					while (*foo && *foo != mQuoteChar ) foo++;
+					if ( *foo ) *foo = 32;
 				}
 
 				// continue..until we hit an eos ..
-				while (!EOS(*foo))  // until we hit EOS
+				while ( !EOS(*foo) ) // until we hit EOS
 				{
-					if (IsWhiteSpace(*foo))  // if we hit a space, stomp a zero byte, and exit
+					if ( IsWhiteSpace(*foo) ) // if we hit a space, stomp a zero byte, and exit
 					{
 						*foo = 0;
 						foo++;
 						break;
 					}
-					else if (IsHard(*foo))  // if we hit a hard separator, stomp a zero byte and store the hard separator argument
+					else if ( IsHard(*foo) ) // if we hit a hard separator, stomp a zero byte and store the hard separator argument
 					{
-						const char *hard = &mHardString[*foo * 2];
+						const char *hard = &mHardString[*foo*2];
 						*foo = 0;
-						if (argc < MAXARGS)
+						if ( argc < MAXARGS )
 						{
 							argv[argc++] = hard;
 						}
@@ -507,13 +516,13 @@ const char **InPlaceParser::GetArglist(char *line, int &count)  // convert sourc
 						break;
 					}
 					foo++;
-				}  // end of while loop...
+				} // end of while loop...
 			}
 		}
 	}
 
 	count = argc;
-	if (argc)
+	if ( argc )
 	{
 		ret = argv;
 	}
@@ -528,183 +537,187 @@ const char **InPlaceParser::GetArglist(char *line, int &count)  // convert sourc
 class GeometryVertex
 {
 public:
-	float mPos[3];
-	float mNormal[3];
-	float mTexel[2];
+	double        mPos[3];
+	double        mNormal[3];
+	double        mTexel[2];
 };
+
 
 class GeometryInterface
 {
 public:
-	virtual void NodeTriangle(const GeometryVertex *v1, const GeometryVertex *v2, const GeometryVertex *v3) {}
 
-	virtual ~GeometryInterface() {}
+	virtual void NodeTriangle(const GeometryVertex *v1,const GeometryVertex *v2,const GeometryVertex *v3)
+	{
+	}
+
 };
+
 
 /*******************************************************************/
 /******************** Obj.h  ********************************/
 /*******************************************************************/
 
+
 class OBJ : public InPlaceParserInterface
 {
 public:
-	int LoadMesh(const char *fname, GeometryInterface *callback);
-	int ParseLine(int lineno, int argc, const char **argv);  // return TRUE to continue parsing, return FALSE to abort parsing process
+  int          LoadMesh(const char *fname,GeometryInterface *callback);
+  int ParseLine(int lineno,int argc,const char **argv);  // return TRUE to continue parsing, return FALSE to abort parsing process
 private:
-	void getVertex(GeometryVertex &v, const char *face) const;
 
-	FloatVector mVerts;
-	FloatVector mTexels;
-	FloatVector mNormals;
+  void GetVertex(GeometryVertex &v,const char *face) const;
 
-	GeometryInterface *mCallback;
+  FloatVector     mVerts;
+  FloatVector     mTexels;
+  FloatVector     mNormals;
+
+  GeometryInterface *mCallback;
+  friend class WavefrontObj;
 };
+
 
 /*******************************************************************/
 /******************** Obj.cpp  ********************************/
 /*******************************************************************/
 
-int OBJ::LoadMesh(const char *fname, GeometryInterface *iface)
+int OBJ::LoadMesh(const char *fname,GeometryInterface *iface)
 {
-	int ret = 0;
+  int ret = 0;
 
-	mVerts.clear();
-	mTexels.clear();
-	mNormals.clear();
+  mVerts.clear();
+  mTexels.clear();
+  mNormals.clear();
 
-	mCallback = iface;
+  mCallback = iface;
 
-	InPlaceParser ipp(fname);
+  InPlaceParser ipp(fname);
 
-	ipp.Parse(this);
+  ipp.Parse(this);
 
-	return ret;
+
+  return ret;
 }
 
-//static const char * GetArg(const char **argv,int i,int argc)
-//{
-// const char * ret = 0;
-// if ( i < argc ) ret = argv[i];
-// return ret;
-//}
-
-void OBJ::getVertex(GeometryVertex &v, const char *face) const
+static const char * GetArg(const char **argv,int i,int argc)
 {
-	v.mPos[0] = 0;
-	v.mPos[1] = 0;
-	v.mPos[2] = 0;
-
-	v.mTexel[0] = 0;
-	v.mTexel[1] = 0;
-
-	v.mNormal[0] = 0;
-	v.mNormal[1] = 1;
-	v.mNormal[2] = 0;
-
-	int index = atoi(face) - 1;
-
-	const char *texel = strstr(face, "/");
-
-	if (texel)
-	{
-		int tindex = atoi(texel + 1) - 1;
-
-		if (tindex >= 0 && tindex < (int)(mTexels.size() / 2))
-		{
-			const float *t = &mTexels[tindex * 2];
-
-			v.mTexel[0] = t[0];
-			v.mTexel[1] = t[1];
-		}
-
-		const char *normal = strstr(texel + 1, "/");
-		if (normal)
-		{
-			int nindex = atoi(normal + 1) - 1;
-
-			if (nindex >= 0 && nindex < (int)(mNormals.size() / 3))
-			{
-				const float *n = &mNormals[nindex * 3];
-
-				v.mNormal[0] = n[0];
-				v.mNormal[1] = n[1];
-				v.mNormal[2] = n[2];
-			}
-		}
-	}
-
-	if (index >= 0 && index < (int)(mVerts.size() / 3))
-	{
-		const float *p = &mVerts[index * 3];
-
-		v.mPos[0] = p[0];
-		v.mPos[1] = p[1];
-		v.mPos[2] = p[2];
-	}
+  const char * ret = 0;
+  if ( i < argc ) ret = argv[i];
+  return ret;
 }
 
-int OBJ::ParseLine(int lineno, int argc, const char **argv)  // return TRUE to continue parsing, return FALSE to abort parsing process
+void OBJ::GetVertex(GeometryVertex &v,const char *face) const
 {
-	int ret = 0;
+  v.mPos[0] = 0;
+  v.mPos[1] = 0;
+  v.mPos[2] = 0;
 
-	if (argc >= 1)
-	{
-		const char *foo = argv[0];
-		if (*foo != '#')
-		{
-			if (strcmp(argv[0], "v") == 0 && argc == 4)
+  v.mTexel[0] = 0;
+  v.mTexel[1] = 0;
 
-			//if ( stricmp(argv[0],"v") == 0 && argc == 4 )
-			{
-				float vx = (float)atof(argv[1]);
-				float vy = (float)atof(argv[2]);
-				float vz = (float)atof(argv[3]);
-				mVerts.push_back(vx);
-				mVerts.push_back(vy);
-				mVerts.push_back(vz);
-			}
-			else if (strcmp(argv[0], "vt") == 0 && argc == 3)
+  v.mNormal[0] = 0;
+  v.mNormal[1] = 1;
+  v.mNormal[2] = 0;
 
-			//     else if ( stricmp(argv[0],"vt") == 0 && argc == 3 )
-			{
-				float tx = (float)atof(argv[1]);
-				float ty = (float)atof(argv[2]);
-				mTexels.push_back(tx);
-				mTexels.push_back(ty);
-			}
-			//  else if ( stricmp(argv[0],"vn") == 0 && argc == 4 )
+  int index = atoi( face )-1;
 
-			else if (strcmp(argv[0], "vn") == 0 && argc == 4)
-			{
-				float normalx = (float)atof(argv[1]);
-				float normaly = (float)atof(argv[2]);
-				float normalz = (float)atof(argv[3]);
-				mNormals.push_back(normalx);
-				mNormals.push_back(normaly);
-				mNormals.push_back(normalz);
-			}
-			//  else if ( stricmp(argv[0],"f") == 0 && argc >= 4 )
+  const char *texel = strstr(face,"/");
 
-			else if (strcmp(argv[0], "f") == 0 && argc >= 4)
-			{
-				GeometryVertex v[32];
+  if ( texel )
+  {
+    int tindex = atoi( texel+1) - 1;
 
-				int vcount = argc - 1;
+    if ( tindex >=0 && tindex < (int)(mTexels.size()/2) )
+    {
+    	const double *t = &mTexels[tindex*2];
 
-				for (int i = 1; i < argc; i++)
-				{
-					getVertex(v[i - 1], argv[i]);
-				}
+      v.mTexel[0] = t[0];
+      v.mTexel[1] = t[1];
 
-				// need to generate a normal!
-#if 0  // not currently implemented
+    }
+
+    const char *normal = strstr(texel+1,"/");
+    if ( normal )
+    {
+      int nindex = atoi( normal+1 ) - 1;
+
+      if (nindex >= 0 && nindex < (int)(mNormals.size()/3) )
+      {
+      	const double *n = &mNormals[nindex*3];
+
+        v.mNormal[0] = n[0];
+        v.mNormal[1] = n[1];
+        v.mNormal[2] = n[2];
+      }
+    }
+  }
+
+  if ( index >= 0 && index < (int)(mVerts.size()/3) )
+  {
+
+    const double *p = &mVerts[index*3];
+
+    v.mPos[0] = p[0];
+    v.mPos[1] = p[1];
+    v.mPos[2] = p[2];
+  }
+
+}
+
+int OBJ::ParseLine(int lineno,int argc,const char **argv)  // return TRUE to continue parsing, return FALSE to abort parsing process
+{
+  int ret = 0;
+
+  if ( argc >= 1 )
+  {
+    const char *foo = argv[0];
+    if ( *foo != '#' )
+    {
+      if ( strcmp(argv[0],"v") == 0 && argc == 4 )
+      {
+        double vx = (double) atof( argv[1] );
+        double vy = (double) atof( argv[2] );
+        double vz = (double) atof( argv[3] );
+        mVerts.push_back(vx);
+        mVerts.push_back(vy);
+        mVerts.push_back(vz);
+      }
+      else if ( strcmp(argv[0],"vt") == 0 && argc == 3 )
+      {
+        double tx = (double) atof( argv[1] );
+        double ty = (double) atof( argv[2] );
+        mTexels.push_back(tx);
+        mTexels.push_back(ty);
+      }
+      else if ( strcmp(argv[0],"vn") == 0 && argc == 4 )
+      {
+        double normalx = (double) atof(argv[1]);
+        double normaly = (double) atof(argv[2]);
+        double normalz = (double) atof(argv[3]);
+        mNormals.push_back(normalx);
+        mNormals.push_back(normaly);
+        mNormals.push_back(normalz);
+      }
+      else if ( strcmp(argv[0],"f") == 0 && argc >= 4 )
+      {
+        GeometryVertex v[32];
+
+        int vcount = argc-1;
+
+        for (int i=1; i<argc; i++)
+        {
+          GetVertex(v[i-1],argv[i] );
+        }
+
+        // need to generate a normal!
+#if 0 // not currently implemented
         if ( mNormals.empty() )
         {
-          Vector3d<float> p1( v[0].mPos );
-          Vector3d<float> p2( v[1].mPos );
-          Vector3d<float> p3( v[2].mPos );
+          Vector3d<double> p1( v[0].mPos );
+          Vector3d<double> p2( v[1].mPos );
+          Vector3d<double> p3( v[2].mPos );
 
-          Vector3d<float> n;
+          Vector3d<double> n;
           n.ComputeNormal(p3,p2,p1);
 
           for (int i=0; i<vcount; i++)
@@ -717,108 +730,129 @@ int OBJ::ParseLine(int lineno, int argc, const char **argv)  // return TRUE to c
         }
 #endif
 
-				mCallback->NodeTriangle(&v[0], &v[1], &v[2]);
+        mCallback->NodeTriangle(&v[0],&v[1],&v[2]);
 
-				if (vcount >= 3)  // do the fan
-				{
-					for (int i = 2; i < (vcount - 1); i++)
-					{
-						mCallback->NodeTriangle(&v[0], &v[i], &v[i + 1]);
-					}
-				}
-			}
-		}
-	}
+        if ( vcount >=3 ) // do the fan
+        {
+          for (int i=2; i<(vcount-1); i++)
+          {
+            mCallback->NodeTriangle(&v[0],&v[i],&v[i+1]);
+          }
+        }
 
-	return ret;
+      }
+    }
+  }
+
+  return ret;
 }
+
+
+
 
 class BuildMesh : public GeometryInterface
 {
 public:
-	int getIndex(const float *p)
-	{
-		int vcount = mVertices.size() / 3;
 
-		if (vcount > 0)
+	int GetIndex(const double *p)
+	{
+
+		int vcount = mVertices.size()/3;
+
+		if(vcount>0)
 		{
 			//New MS STL library checks indices in debug build, so zero causes an assert if it is empty.
-			const float *v = &mVertices[0];
+			const double *v = &mVertices[0];
 
-			for (int i = 0; i < vcount; i++)
+			for (int i=0; i<vcount; i++)
 			{
-				if (v[0] == p[0] && v[1] == p[1] && v[2] == p[2]) return i;
-				v += 3;
+				if ( v[0] == p[0] && v[1] == p[1] && v[2] == p[2] ) return i;
+				v+=3;
 			}
 		}
 
-		mVertices.push_back(p[0]);
-		mVertices.push_back(p[1]);
-		mVertices.push_back(p[2]);
+		mVertices.push_back( p[0] );
+		mVertices.push_back( p[1] );
+		mVertices.push_back( p[2] );
 
 		return vcount;
 	}
 
-	virtual void NodeTriangle(const GeometryVertex *v1, const GeometryVertex *v2, const GeometryVertex *v3)
+	virtual void NodeTriangle(const GeometryVertex *v1,const GeometryVertex *v2,const GeometryVertex *v3)
 	{
-		mIndices.push_back(getIndex(v1->mPos));
-		mIndices.push_back(getIndex(v2->mPos));
-		mIndices.push_back(getIndex(v3->mPos));
+		mIndices.push_back( GetIndex(v1->mPos) );
+		mIndices.push_back( GetIndex(v2->mPos) );
+		mIndices.push_back( GetIndex(v3->mPos) );
 	}
 
-	const FloatVector &GetVertices(void) const { return mVertices; };
-	const IntVector &GetIndices(void) const { return mIndices; };
+  const FloatVector& GetVertices(void) const { return mVertices; };
+  const IntVector& GetIndices(void) const { return mIndices; };
 
 private:
-	FloatVector mVertices;
-	IntVector mIndices;
+  FloatVector     mVertices;
+  IntVector		    mIndices;
 };
+
 
 WavefrontObj::WavefrontObj(void)
 {
 	mVertexCount = 0;
-	mTriCount = 0;
-	mIndices = 0;
-	mVertices = 0;
+	mTriCount    = 0;
+	mIndices     = 0;
+	mVertices    = 0;
 }
 
 WavefrontObj::~WavefrontObj(void)
 {
-	delete[] mIndices;
-	delete[] mVertices;
+	delete mIndices;
+	delete mVertices;
 }
 
-unsigned int WavefrontObj::loadObj(const char *fname)  // load a wavefront obj returns number of triangles that were loaded.  Data is persists until the class is destructed.
+unsigned int WavefrontObj::loadObj(const char *fname) // load a wavefront obj returns number of triangles that were loaded.  Data is persists until the class is destructed.
 {
+
 	unsigned int ret = 0;
 
-	delete[] mVertices;
+	delete mVertices;
 	mVertices = 0;
-	delete[] mIndices;
+	delete mIndices;
 	mIndices = 0;
 	mVertexCount = 0;
 	mTriCount = 0;
 
-	BuildMesh bm;
 
-	OBJ obj;
+  BuildMesh bm;
 
-	obj.LoadMesh(fname, &bm);
+  OBJ obj;
+
+  obj.LoadMesh(fname,&bm);
+
 
 	const FloatVector &vlist = bm.GetVertices();
 	const IntVector &indices = bm.GetIndices();
-	if (vlist.size())
+	if ( vlist.size() )
 	{
-		mVertexCount = vlist.size() / 3;
-		mVertices = new float[mVertexCount * 3];
-		memcpy(mVertices, &vlist[0], sizeof(float) * mVertexCount * 3);
-		mTriCount = indices.size() / 3;
-		mIndices = new int[mTriCount * 3 * sizeof(int)];
-		memcpy(mIndices, &indices[0], sizeof(int) * mTriCount * 3);
+		mVertexCount = vlist.size()/3;
+		mVertices = new double[mVertexCount*3];
+		memcpy( mVertices, &vlist[0], sizeof(double)*mVertexCount*3 );
+		mTriCount = indices.size()/3;
+		mIndices = new int[mTriCount*3*sizeof(int)];
+		memcpy(mIndices, &indices[0], sizeof(int)*mTriCount*3);
 		ret = mTriCount;
 	}
+    else if( obj.mVerts.size() > 0 ) {
+        // take consecutive vertices
+        mVertexCount = obj.mVerts.size()/3;
+        mVertices = new double[mVertexCount*3];
+        memcpy( mVertices, &obj.mVerts[0], sizeof(double)*mVertexCount*3 );
+        mTriCount = mVertexCount/3;
+        mIndices = new int[mTriCount*3*sizeof(int)];
+        for(int i = 0; i < mVertexCount; ++i)
+            mIndices[i] = i;
+        ret = mTriCount;
+    }
 
 	return ret;
 }
 
-}  // namespace ConvexDecomposition
+};

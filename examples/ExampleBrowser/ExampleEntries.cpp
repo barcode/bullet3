@@ -100,6 +100,12 @@
 #include "../ExtendedTutorials/MultiPendulum.h"
 #include "../Evolution/NN3DWalkers.h"
 
+
+#include "../MyTests/CompoundShapeCollision.h"
+#include "../MyTests/ManualMesh.h"
+#include "../MyTests/ConvexDecomposition.h"
+
+
 struct ExampleEntry
 {
 	int m_menuLevel;
@@ -361,7 +367,11 @@ static ExampleEntry gDefaultExamples[] =
 		//todo: create a category/tutorial about advanced topics, such as optimizations, using different collision detection algorithm, different constraint solvers etc.
 		//ExampleEntry(0,"Advanced"),
 		//ExampleEntry(1,"Obj2RigidBody Add Features", "Load a triangle mesh from Wavefront .obj and create polyhedral features to perform the separating axis test (instead of GJK/MPR). It is best to combine optimization and polyhedral feature generation.", ET_RigidBodyFromObjCreateFunc,OptimizeConvexObj+ComputePolyhedralFeatures),
-
+    
+        ExampleEntry(0, "My tests"),
+        ExampleEntry(1, "Compound Mesh Collision", "Shows collision between a compound mesh and a box", MT_CompoundShapeCollision),
+        ExampleEntry(1, "Manual Mesh", "Shows how to manually create a mesh in code", MT_ManualMesh),
+    ExampleEntry(1, "Coovex decomposition", "Shows collision between a compound mesh and a box", MT_ConvexDecomposition),
 };
 
 #ifdef B3_USE_CLEW

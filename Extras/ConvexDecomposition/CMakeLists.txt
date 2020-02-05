@@ -4,7 +4,8 @@ INCLUDE_DIRECTORIES(
 
 SET(ConvexDecomposition_SRCS
 	bestfitobb.cpp
-	ConvexBuilder.cpp
+#	ConvexBuilder.cpp
+	triangulate.cpp
 	cd_wavefront.cpp
 	fitsphere.cpp
 	meshvolume.cpp
@@ -24,7 +25,8 @@ SET(ConvexDecomposition_HDRS
 	cd_vector.h
 	concavity.h
 	bestfitobb.h
-	ConvexBuilder.h
+    #	ConvexBuilder.h
+    triangulate.h
 	cd_wavefront.h
 	fitsphere.h
 	meshvolume.h

@@ -1,20 +1,6 @@
-#ifndef BEST_FIT_H
+#ifndef TRIANGULATE_H
 
-#define BEST_FIT_H
-
-// This routine was released in 'snippet' form
-// by John W. Ratcliff mailto:jratcliff@infiniplex.net
-// on March 22, 2006.
-//
-// This routine computes the 'best fit' plane equation to
-// a set of input data points with an optional per vertex
-// weighting component.
-//
-// The implementation for this was lifted directly from
-// David Eberly's Magic Software implementation.
-
-// computes the best fit plane to a collection of data points.
-// returns the plane equation as A,B,C,D format. (Ax+By+Cz+D)
+#define TRIANGULATE_H
 
 /*!  
 ** 
@@ -61,29 +47,38 @@
 ** The above copyright notice and this permission notice shall be included in all 
 ** copies or substantial portions of the Software.
 
-** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-** IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-** FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-** AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-** WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+** IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+** FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+** AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+** WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 ** CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
+
+
 namespace ConvexDecomposition
 {
 
+// all 3d triangles should be co-planer.  Doesn't bother to check, you should have done that yourself to begin with!
+unsigned int triangulate3d(unsigned int pcount,     // number of points in the polygon
+                           const double *vertices,   // array of 3d vertices.
+                           double *triangles,        // memory to store output triangles
+                           unsigned int maxTri,
+                           const double *plane);    // maximum triangles we are allowed to output.
 
-bool getBestFitPlane(unsigned int vcount,     // number of input data points
-                     const double *points,     // starting address of points array.
-                     unsigned int vstride,    // stride between input points.
-                     const double *weights,    // *optional point weighting values.
-                     unsigned int wstride,    // weight stride for each vertex.
-                     double *plane);
+unsigned int triangulate3d(unsigned int pcount,     // number of points in the polygon
+                           const unsigned int *indices, // polygon points using indices
+                           const double *vertices,   // base address for array indexing
+                           double *triangles,        // buffer to store output 3d triangles.
+                           unsigned int maxTri,
+                           const double *plane);    // maximum triangles we can output.
 
-
-double getBoundingRegion(unsigned int vcount,const double *points,unsigned int pstride,double *bmin,double *bmax); // returns the diagonal distance
-bool  overlapAABB(const double *bmin1,const double *bmax1,const double *bmin2,const double *bmax2); // return true if the two AABB's overlap.
+unsigned int triangulate2d(unsigned int pcount,     // number of points in the polygon
+                           const double *vertices,   // address of input points (2d)
+                           double *triangles,        // destination buffer for output triangles.
+                           unsigned int maxTri);    // maximum number of triangles we can store.
 
 };
 

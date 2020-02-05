@@ -52,7 +52,8 @@ IF (BUILD_SHARED_LIBS)
                 TARGET_LINK_LIBRARIES(
                         BulletExampleBrowserLib Bullet3Common BulletSoftBody BulletDynamics BulletCollision BulletInverseDynamicsUtils
                         BulletInverseDynamics LinearMath OpenGLWindow gwen BussIK
-                        ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY}
+                        ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY} 
+                        ConvexDecomposition
                 )
 		ELSE(WIN32)
         IF(APPLE)
@@ -400,6 +401,18 @@ SET(BulletExampleBrowser_SRCS
 	${BULLET_PHYSICS_SOURCE_DIR}/build3/bullet.rc
 )
 
+find_package(CGAL REQUIRED)
+
+SET(MyTestsSources
+    ../MyTests/CompoundShapeCollision.cpp
+	../MyTests/CompoundShapeCollision.h
+    
+    ../MyTests/ManualMesh.cpp
+	../MyTests/ManualMesh.h
+
+    ../MyTests/ConvexDecomposition.cpp
+	../MyTests/ConvexDecomposition.h
+)
 
 
 ADD_EXECUTABLE(App_ExampleBrowser
@@ -408,7 +421,11 @@ ADD_EXECUTABLE(App_ExampleBrowser
 		ExampleEntries.h
 		${ExtendedTutorialsSources}
 		${BulletExampleBrowser_SRCS} 
+        ${MyTestsSources}
 )
+
+target_link_libraries(App_ExampleBrowser PRIVATE CGAL::CGAL)
+target_link_libraries(App_ExampleBrowser PRIVATE ConvexDecomposition)
 
 FILE( MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/data" )
 
